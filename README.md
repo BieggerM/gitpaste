@@ -87,6 +87,13 @@ go build ./cmd/gitpaste
 goreleaser release --snapshot --clean
 ```
 
-Push a semantic version tag such as `v0.1.0` to run tests and publish Linux/macOS `amd64`/`arm64` `.tar.gz` archives and `checksums.txt` through GitHub Actions. Homebrew, an optional Oh My Zsh wrapper, and `.deb`/`.rpm` assets are intentionally deferred until this release flow is established.
+Run the release workflow with a semantic version to have GitHub's workers verify, tag, publish, checksum, and smoke-test the release:
+
+```bash
+gh workflow run release.yml --ref main -f version=v0.1.0-rc.1
+gh run watch --exit-status
+```
+
+Pushing an existing semantic version tag such as `v0.1.0` also starts the same pipeline. Releases contain Linux/macOS `amd64`/`arm64` `.tar.gz` archives and `checksums.txt`. Homebrew, an optional Oh My Zsh wrapper, and `.deb`/`.rpm` assets are intentionally deferred until this release flow is established.
 
 Licensed under the MIT License.

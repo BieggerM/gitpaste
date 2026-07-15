@@ -4,25 +4,138 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic version to publish, such as v0.1.0-rc.1
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  release:
+  verify:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v5
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.ref }}
+      - id: version
+        name: Validate release version and source
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+          WORKFLOW_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$WORKFLOW_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
+              echo "Manual releases must run from $DEFAULT_BRANCH" >&2
+              exit 1
+            fi
+            version=$REQUESTED_VERSION
+          else
+            version=$REF_NAME
+          fi
+          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
+            echo "Invalid release version: $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
+      - run: sudo apt-get update
+      - run: sudo apt-get install --no-install-recommends --yes zsh
+      - run: go test -race ./...
+      - run: go vet ./...
+      - run: test -z "$(gofmt -l .)"
+      - run: bash -n shell/gitpaste.bash
+      - run: zsh -n shell/gitpaste.zsh
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           distribution: goreleaser
-          version: '~> v2'
+          version: v2.17.0
+          args: release --snapshot --clean
+
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.ref }}
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Create manual release tag
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git rev-parse --verify --quiet "refs/tags/$VERSION" >/dev/null; then
+            if [[ "$(git rev-list -n 1 "$VERSION")" != "$(git rev-parse HEAD)" ]]; then
+              echo "Tag $VERSION already points to a different commit" >&2
+              exit 1
+            fi
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag --annotate "$VERSION" --message "gitpaste $VERSION"
+            git push origin "refs/tags/$VERSION"
+          fi
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: v2.17.0
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  smoke:
+    needs: [verify, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - name: Download and verify release assets
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir dist
+          gh release download "$VERSION" --repo "$REPOSITORY" --dir dist
+          cd dist
+          sha256sum --check checksums.txt
+      - name: Smoke test Linux binary and shell setup
+        run: |
+          set -euo pipefail
+          archive="dist/gitpaste_${VERSION#v}_linux_amd64.tar.gz"
+          mkdir dist/unpacked
+          tar --extract --gzip --file "$archive" --directory dist/unpacked
+          dist/unpacked/gitpaste version
+          dist/unpacked/gitpaste validate https://github.com/owner/repository
+          test_home="$RUNNER_TEMP/gitpaste-home"
+          mkdir --parents "$test_home"
+          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" SHELL=/bin/bash dist/unpacked/gitpaste setup
+          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" SHELL=/bin/bash dist/unpacked/gitpaste uninstall-shell-hook

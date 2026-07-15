@@ -48,3 +48,12 @@ Goal: build a production-quality Go CLI that safely turns a single pasted, suppo
 - [x] Re-run formatting, tests/race tests, vet, cross-builds, shell checks, setup smoke tests, and focused review.
 
 Remediation verification: all Go tests and race tests pass, vet is clean, Bash/Zsh syntax checks pass, all four release targets cross-build, symlink and repeated-source regressions pass, and a temporary-home setup/second-setup/uninstall smoke test confirmed private modes and idempotent status reporting. CodeRabbit remained unavailable, so the final review was local.
+
+## Worker-driven release pipeline
+
+- [ ] Remove CI annotations by updating pinned GitHub-owned actions and disabling the empty-module cache.
+- [ ] Add a manual semantic-version release input while preserving version-tag releases.
+- [ ] Verify on workers before publishing: tests, vet, formatting, shell syntax, and a GoReleaser snapshot.
+- [ ] Publish through a separately permissioned job, creating an idempotent annotated tag only for manual releases.
+- [ ] Add post-release checksum and Linux binary/setup smoke tests.
+- [ ] Validate locally, commit, push, and watch the worker run.
