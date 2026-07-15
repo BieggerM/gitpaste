@@ -51,9 +51,11 @@ Remediation verification: all Go tests and race tests pass, vet is clean, Bash/Z
 
 ## Worker-driven release pipeline
 
-- [ ] Remove CI annotations by updating pinned GitHub-owned actions and disabling the empty-module cache.
-- [ ] Add a manual semantic-version release input while preserving version-tag releases.
-- [ ] Verify on workers before publishing: tests, vet, formatting, shell syntax, and a GoReleaser snapshot.
-- [ ] Publish through a separately permissioned job, creating an idempotent annotated tag only for manual releases.
-- [ ] Add post-release checksum and Linux binary/setup smoke tests.
-- [ ] Validate locally, commit, push, and watch the worker run.
+- [x] Remove CI annotations by updating pinned GitHub-owned actions and disabling the empty-module cache.
+- [x] Add a manual semantic-version release input while preserving version-tag releases.
+- [x] Verify on workers before publishing: tests, vet, formatting, shell syntax, and a GoReleaser snapshot.
+- [x] Publish through a separately permissioned job, creating an idempotent annotated tag only for manual releases.
+- [x] Add post-release checksum and Linux binary/setup smoke tests.
+- [x] Validate locally, commit, push, and watch the worker run.
+
+GitHub accepted both workflows, and the annotation-free test run for commit `9f19d93` passed. The release workflow is active but intentionally has not been dispatched, so no tag or release exists yet.
