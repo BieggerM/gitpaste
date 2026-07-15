@@ -1,0 +1,44 @@
+version: 2
+
+project_name: gitpaste
+
+before:
+  hooks:
+    - go test ./...
+
+builds:
+  - id: gitpaste
+    main: ./cmd/gitpaste
+    binary: gitpaste
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: archives
+    ids: [gitpaste]
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - README.md
+      - ARCHITECTURE.md
+      - LICENSE
+      - shell/*
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
