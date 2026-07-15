@@ -58,4 +58,4 @@ Remediation verification: all Go tests and race tests pass, vet is clean, Bash/Z
 - [x] Add post-release checksum and Linux binary/setup smoke tests.
 - [x] Validate locally, commit, push, and watch the worker run.
 
-GitHub accepted both workflows, and the annotation-free test run for commit `9f19d93` passed. The release workflow is active but intentionally has not been dispatched, so no tag or release exists yet.
+GitHub accepted both workflows, and the annotation-free test run for commit `9f19d93` passed. The first `v0.1.0-rc.1` run passed verification, publishing, checksum verification, and binary/setup smoke tests. GoReleaser required an explicit `release.prerelease: auto` setting; the published RC metadata was corrected and future candidates now inherit prerelease status automatically.
