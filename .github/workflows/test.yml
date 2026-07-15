@@ -17,6 +17,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - run: sudo apt-get update
+      - run: sudo apt-get install --no-install-recommends --yes zsh
       - run: go test -race ./...
       - run: go vet ./...
       - run: test -z "$(gofmt -l .)"
